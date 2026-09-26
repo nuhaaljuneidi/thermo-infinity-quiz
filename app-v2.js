@@ -1,12 +1,65 @@
 const phases=["Compressed liquid","Saturated liquid","Saturated mixture","Saturated vapor","Superheated vapor"];
 const $=id=>document.getElementById(id);
-let activeCase=null,officialCaseNumber=null,quizMode="official",officialSubmitted=false,practiceAttempt=0;
+const ERAU_EMAIL_RE=/^[^\s@]+@my\.erau\.edu$/i;
+let activeCase=null,officialCaseNumber=null,quizMode="official",officialSubmitted=false,practiceAttempt=0,currentDisplayName="";
 
 function hash(text){let h=2166136261;for(const ch of text.trim().toLowerCase()){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
-function assignmentKey(id){return `thermo-infinity:${id.trim().toLowerCase()}`}
-function completionKey(id){return `thermo-infinity:complete:${id.trim().toLowerCase()}`}
-function assignCase(id){const key=assignmentKey(id);let n=Number(localStorage.getItem(key));if(!n||n<1||n>THERMO_CASES.length){n=(hash(id)%THERMO_CASES.length)+1;localStorage.setItem(key,String(n))}return THERMO_CASES[n-1]}
+function assignmentKey(email){return `thermo-infinity:${email}`}
+function completionKey(email){return `thermo-infinity:complete:${email}`}
+function assignCase(email){const key=assignmentKey(email);let n=Number(localStorage.getItem(key));if(!n||n<1||n>THERMO_CASES.length){n=(hash(email)%THERMO_CASES.length)+1;localStorage.setItem(key,String(n))}return THERMO_CASES[n-1]}
 async function api(payload){if(!THERMO_QUIZ_API)return null;const response=await fetch(THERMO_QUIZ_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});if(!response.ok)throw new Error("The assignment service is temporarily unavailable.");const data=await response.json();if(!data.ok)throw new Error(data.error||"The assignment service returned an error.");return data}
+
+function normalizeEmail(raw){return String(raw||"").trim().toLowerCase()}
+function isValidErauEmail(email){return ERAU_EMAIL_RE.test(email)}
+
+function currentSectionValue(){const select=$('courseSection');if(!select)return "";if(select.value==="Other section")return $('otherSection').value.trim();return select.value}
+
+function setupSectionToggle(){const select=$('courseSection'),wrap=$('otherSectionWrap'),other=$('otherSection');select.addEventListener('change',()=>{const isOther=select.value==="Other section";wrap.hidden=!isOther;other.required=isOther;if(!isOther){other.value="";other.setAttribute('aria-invalid','false');$('otherSectionError').textContent=""}$('sectionError').textContent="";select.setAttribute('aria-invalid','false')})}
+
+function validateIdentityForm(){let valid=true;
+  const firstName=$('firstName').value.trim();
+  const lastName=$('lastName').value.trim();
+  $('firstName').setAttribute('aria-invalid',firstName?'false':'true');
+  $('lastName').setAttribute('aria-invalid',lastName?'false':'true');
+  if(!firstName)valid=false;
+  if(!lastName)valid=false;
+
+  const email=normalizeEmail($('erauEmail').value);
+  const emailError=$('emailError');
+  if(!email||!isValidErauEmail(email)){
+    emailError.textContent="Enter your ERAU student email ending in @my.erau.edu.";
+    $('erauEmail').setAttribute('aria-invalid','true');
+    valid=false;
+  } else {
+    emailError.textContent="";
+    $('erauEmail').setAttribute('aria-invalid','false');
+  }
+
+  const sectionSelect=$('courseSection');
+  const sectionError=$('sectionError');
+  if(!sectionSelect.value){
+    sectionError.textContent="Select your course section.";
+    sectionSelect.setAttribute('aria-invalid','true');
+    valid=false;
+  } else {
+    sectionError.textContent="";
+    sectionSelect.setAttribute('aria-invalid','false');
+  }
+
+  if(sectionSelect.value==="Other section"){
+    const other=$('otherSection');
+    const otherError=$('otherSectionError');
+    if(!other.value.trim()){
+      otherError.textContent="Enter your section.";
+      other.setAttribute('aria-invalid','true');
+      valid=false;
+    } else {
+      otherError.textContent="";
+      other.setAttribute('aria-invalid','false');
+    }
+  }
+  return valid;
+}
 
 function setMode(mode){quizMode=mode;const practice=mode==="practice";$('modeBadge').textContent=practice?"Practice mode":"Official assignment";$('modeBadge').classList.toggle('practice',practice);$('checkButton').textContent=practice?"Check practice case":"Submit official case"}
 function resetResponses(){document.querySelectorAll('input[name="phase"]').forEach(input=>{input.checked=false;input.disabled=false});activeCase.find.forEach((_,i)=>{const input=$(`prop${i}`);if(input){input.value="";input.disabled=false}});['tvDiagram','pvDiagram'].forEach(id=>{const svg=$(id);delete svg.dataset.x;delete svg.dataset.y;const marker=svg.querySelector('.marker');if(marker)marker.innerHTML=""});$('results').hidden=true;$('phaseHint').hidden=true;$('checkButton').disabled=false}
@@ -15,11 +68,40 @@ function renderCase(c,name,mode=quizMode){activeCase=c;setMode(mode);$('workspac
 function drawDiagram(svg,yLabel){svg.setAttribute('viewBox','0 0 430 260');svg.innerHTML=`<rect width="430" height="260" fill="#fff"/><g stroke="#dbe3ec" stroke-width="1"><path d="M50 20V220H410" fill="none" stroke="#173d65" stroke-width="2"/><path d="M50 170H410M50 120H410M50 70H410"/><path d="M140 20V220M230 20V220M320 20V220"/></g><path d="M105 220 C110 130 145 62 210 48 C275 62 310 130 315 220" fill="rgba(16,59,105,.08)" stroke="#123b69" stroke-width="3"/><text x="20" y="28" fill="#071f3d" font-weight="700">${yLabel}</text><text x="400" y="246" fill="#071f3d" font-weight="700">v</text><text x="170" y="198" fill="#587089" font-size="12">two-phase region</text><g class="marker"></g>`;svg.onclick=placeMarker}
 function placeMarker(e){const svg=e.currentTarget;if($('checkButton').disabled)return;const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const p=pt.matrixTransform(svg.getScreenCTM().inverse());const x=Math.max(50,Math.min(410,p.x)),y=Math.max(20,Math.min(220,p.y));svg.dataset.x=x;svg.dataset.y=y;svg.querySelector('.marker').innerHTML=`<circle cx="${x}" cy="${y}" r="8" fill="#ffca05" stroke="#071f3d" stroke-width="3"/><circle cx="${x}" cy="${y}" r="15" fill="none" stroke="#ffca05" stroke-width="2" opacity=".45"/>`}
 function showCompletedOfficial(name){officialSubmitted=true;setMode("official");$('workspace').classList.add('is-submitted');$('practicePanel').hidden=false;$('assignmentNote').textContent=`${name}'s official Case ${officialCaseNumber} has been submitted.`;$('results').hidden=true;$('practicePanel').scrollIntoView({behavior:'smooth',block:'center'})}
-function practiceCase(kind){let next;if(kind==="next")next=(activeCase?.id||officialCaseNumber)%THERMO_CASES.length+1;else{do{next=Math.floor(Math.random()*THERMO_CASES.length)+1}while(next===activeCase?.id&&THERMO_CASES.length>1)}practiceAttempt+=1;renderCase(THERMO_CASES[next-1],$('studentName').value.trim(),"practice");$('workspace').scrollIntoView({behavior:'smooth'})}
+function practiceCase(kind){let next;if(kind==="next")next=(activeCase?.id||officialCaseNumber)%THERMO_CASES.length+1;else{do{next=Math.floor(Math.random()*THERMO_CASES.length)+1}while(next===activeCase?.id&&THERMO_CASES.length>1)}practiceAttempt+=1;renderCase(THERMO_CASES[next-1],currentDisplayName,"practice");$('workspace').scrollIntoView({behavior:'smooth'})}
 
-$('identityForm').addEventListener('submit',async e=>{e.preventDefault();const name=$('studentName').value.trim(),id=$('studentId').value.trim(),button=e.submitter;button.disabled=true;button.textContent="Retrieving…";try{const remote=await api({action:"assign",name,studentId:id});const c=remote?THERMO_CASES[remote.caseNumber-1]:assignCase(id);officialCaseNumber=c.id;localStorage.setItem(assignmentKey(id),String(c.id));officialSubmitted=Boolean(remote?.officialSubmitted)||localStorage.getItem(completionKey(id))==="1";renderCase(c,name,"official");$('welcome').hidden=true;$('workspace').hidden=false;if(officialSubmitted)showCompletedOfficial(name);else $('workspace').scrollIntoView({behavior:'smooth'})}catch(error){alert(error.message)}finally{button.disabled=false;button.textContent="Assign my case"}});
+setupSectionToggle();
+
+$('identityForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(!validateIdentityForm()){
+    const firstInvalid=document.querySelector('#identityForm [aria-invalid="true"]');
+    if(firstInvalid)firstInvalid.focus();
+    return;
+  }
+  const firstName=$('firstName').value.trim();
+  const lastName=$('lastName').value.trim();
+  const email=normalizeEmail($('erauEmail').value);
+  $('erauEmail').value=email;
+  const section=currentSectionValue();
+  const name=`${firstName} ${lastName}`.trim();
+  currentDisplayName=name;
+  const button=e.submitter;
+  button.disabled=true;button.textContent="Retrieving…";
+  try{
+    const remote=await api({action:"assign",firstName,lastName,email,section});
+    const c=remote?THERMO_CASES[remote.caseNumber-1]:assignCase(email);
+    officialCaseNumber=c.id;
+    localStorage.setItem(assignmentKey(email),String(c.id));
+    officialSubmitted=Boolean(remote?.officialSubmitted)||localStorage.getItem(completionKey(email))==="1";
+    renderCase(c,name,"official");
+    $('welcome').hidden=true;$('workspace').hidden=false;
+    if(officialSubmitted)showCompletedOfficial(name);else $('workspace').scrollIntoView({behavior:'smooth'})
+  }catch(error){alert(error.message)}
+  finally{button.disabled=false;button.textContent="Assign my case"}
+});
 $('hintButton').addEventListener('click',()=>{const hints={"Compressed liquid":"Compare the given state with saturation conditions. Is the temperature below saturation at the stated pressure?","Saturated liquid":"Look for a quality of zero or a property equal to the saturated-liquid value.","Saturated mixture":"Check whether the given specific property falls between its saturated-liquid and saturated-vapor values.","Saturated vapor":"Look for a quality of one or a property equal to the saturated-vapor value.","Superheated vapor":"Compare the temperature with saturation temperature at the stated pressure. Is it higher?"};$('phaseHint').textContent=hints[activeCase.phase];$('phaseHint').hidden=false});
-$('checkButton').addEventListener('click',async()=>{if(!activeCase)return;const chosen=document.querySelector('input[name="phase"]:checked')?.value;const phaseOK=chosen===activeCase.phase;const checks=activeCase.find.map((p,i)=>{const raw=$(`prop${i}`).value;const entered=raw===""?NaN:Number(raw);const tol=Math.max(Math.abs(p.value)*p.tolerancePercent/100,0.00001);return {p,entered,ok:Number.isFinite(entered)&&Math.abs(entered-p.value)<=tol}});const plotted=Boolean($('tvDiagram').dataset.x&&$('pvDiagram').dataset.x);const all=Boolean(phaseOK&&checks.every(x=>x.ok)&&plotted);const r=$('results');r.className=`results${all?' success':''}`;r.innerHTML=`<h2>${all?'State resolved':'Review your state'}</h2><ul class="result-list"><li class="${phaseOK?'correct':'incorrect'}">Phase: ${phaseOK?'correct':'recheck your saturation comparison'}</li>${checks.map(x=>`<li class="${x.ok?'correct':'incorrect'}">${x.p.symbol}: ${x.ok?'within the accepted table range':'check the table value and units'}</li>`).join('')}<li class="${plotted?'correct':'incorrect'}">Diagrams: ${plotted?'both placements recorded':'place the state on both diagrams'}</li></ul>${all?`<p><strong>${quizMode==="official"?'Official case complete.':'Practice case complete.'}</strong>${activeCase.extra?' '+activeCase.extra+'.':''}</p>`:'<p>Revise only the marked items, then check again.</p>'}`;r.hidden=false;r.scrollIntoView({behavior:'smooth',block:'nearest'});const payload={action:"submit",mode:quizMode,name:$('studentName').value.trim(),studentId:$('studentId').value.trim(),caseNumber:activeCase.id,attemptNumber:quizMode==="practice"?practiceAttempt:1,phase:chosen||"",answers:checks.map(x=>({symbol:x.p.symbol,value:Number.isFinite(x.entered)?x.entered:null,correct:x.ok})),phaseCorrect:phaseOK,diagramsPlaced:plotted,complete:all,tv:{x:Number($('tvDiagram').dataset.x)||null,y:Number($('tvDiagram').dataset.y)||null},pv:{x:Number($('pvDiagram').dataset.x)||null,y:Number($('pvDiagram').dataset.y)||null}};try{await api(payload)}catch(error){r.insertAdjacentHTML('beforeend',`<p class="incorrect">Your work was checked, but it was not recorded. ${error.message}</p>`);return}if(all&&quizMode==="official"){localStorage.setItem(completionKey(payload.studentId),"1");setTimeout(()=>showCompletedOfficial(payload.name),550)}else if(all&&quizMode==="practice"){$('practicePanel').hidden=false;$('practicePanel').querySelector('.eyebrow').textContent="Practice case complete";$('practicePanel').querySelector('h2').textContent="Choose another case"}});
+$('checkButton').addEventListener('click',async()=>{if(!activeCase)return;const chosen=document.querySelector('input[name="phase"]:checked')?.value;const phaseOK=chosen===activeCase.phase;const checks=activeCase.find.map((p,i)=>{const raw=$(`prop${i}`).value;const entered=raw===""?NaN:Number(raw);const tol=Math.max(Math.abs(p.value)*p.tolerancePercent/100,0.00001);return {p,entered,ok:Number.isFinite(entered)&&Math.abs(entered-p.value)<=tol}});const plotted=Boolean($('tvDiagram').dataset.x&&$('pvDiagram').dataset.x);const all=Boolean(phaseOK&&checks.every(x=>x.ok)&&plotted);const r=$('results');r.className=`results${all?' success':''}`;r.innerHTML=`<h2>${all?'State resolved':'Review your state'}</h2><ul class="result-list"><li class="${phaseOK?'correct':'incorrect'}">Phase: ${phaseOK?'correct':'recheck your saturation comparison'}</li>${checks.map(x=>`<li class="${x.ok?'correct':'incorrect'}">${x.p.symbol}: ${x.ok?'within the accepted table range':'check the table value and units'}</li>`).join('')}<li class="${plotted?'correct':'incorrect'}">Diagrams: ${plotted?'both placements recorded':'place the state on both diagrams'}</li></ul>${all?`<p><strong>${quizMode==="official"?'Official case complete.':'Practice case complete.'}</strong>${activeCase.extra?' '+activeCase.extra+'.':''}</p>`:'<p>Revise only the marked items, then check again.</p>'}`;r.hidden=false;r.scrollIntoView({behavior:'smooth',block:'nearest'});const email=normalizeEmail($('erauEmail').value);const payload={action:"submit",mode:quizMode,firstName:$('firstName').value.trim(),lastName:$('lastName').value.trim(),email,section:currentSectionValue(),caseNumber:activeCase.id,attemptNumber:quizMode==="practice"?practiceAttempt:1,phase:chosen||"",answers:checks.map(x=>({symbol:x.p.symbol,value:Number.isFinite(x.entered)?x.entered:null,correct:x.ok})),phaseCorrect:phaseOK,diagramsPlaced:plotted,complete:all,tv:{x:Number($('tvDiagram').dataset.x)||null,y:Number($('tvDiagram').dataset.y)||null},pv:{x:Number($('pvDiagram').dataset.x)||null,y:Number($('pvDiagram').dataset.y)||null}};try{await api(payload)}catch(error){r.insertAdjacentHTML('beforeend',`<p class="incorrect">Your work was checked, but it was not recorded. ${error.message}</p>`);return}if(all&&quizMode==="official"){localStorage.setItem(completionKey(payload.email),"1");setTimeout(()=>showCompletedOfficial(currentDisplayName),550)}else if(all&&quizMode==="practice"){$('practicePanel').hidden=false;$('practicePanel').querySelector('.eyebrow').textContent="Practice case complete";$('practicePanel').querySelector('h2').textContent="Choose another case"}});
 $('randomPractice').addEventListener('click',()=>practiceCase("random"));
 $('nextPractice').addEventListener('click',()=>practiceCase("next"));
 $('startOver').addEventListener('click',()=>location.reload());
