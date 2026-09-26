@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive thermodynamic state identification and property lookup activity by Dr. Nuha Aljuneidi.">
+  <title>Thermo Infinity Quiz | Dr. Nuha Aljuneidi</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#quiz">Skip to quiz</a>
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">∞</span>
+      <span><strong>Thermo Infinity Quiz</strong><small>Dr. Nuha Aljuneidi</small></span>
+    </div>
+    <button class="text-button" id="startOver" type="button">Start over</button>
+  </header>
+
+  <main id="quiz">
+    <section class="intro" id="welcome">
+      <p class="eyebrow">Thermodynamic properties · individual assignment</p>
+      <h1>One state. Two diagrams.<br>Infinite practice.</h1>
+      <p class="lead">Complete your assigned state first. After submitting it successfully, continue with unlimited practice cases.</p>
+
+      <form class="identity-panel" id="identityForm">
+        <div>
+          <label for="studentName">Student name</label>
+          <input id="studentName" name="studentName" autocomplete="name" required>
+        </div>
+        <div>
+          <label for="studentId">Student ID or university email</label>
+          <input id="studentId" name="studentId" autocomplete="email" required>
+          <small>Used only to assign and restore your case.</small>
+        </div>
+        <button class="primary-button" type="submit">Assign my case</button>
+      </form>
+    </section>
+
+    <section class="workspace" id="workspace" hidden>
+      <aside class="case-rail" aria-label="Assignment information">
+        <p class="mode-badge" id="modeBadge">Official assignment</p>
+        <div class="case-number"><span>Case</span><strong id="caseNumber">—</strong><small>of 40</small></div>
+        <dl class="case-meta">
+          <div><dt>Fluid</dt><dd id="fluid">—</dd></div>
+          <div><dt>Given</dt><dd id="given">—</dd></div>
+          <div><dt>Find</dt><dd id="find">—</dd></div>
+        </dl>
+        <p class="assignment-note" id="assignmentNote"></p>
+      </aside>
+
+      <div class="quiz-column">
+        <section class="step" aria-labelledby="phase-heading">
+          <div class="step-heading"><span>01</span><div><p class="eyebrow">Classify</p><h2 id="phase-heading">What phase is the fluid in?</h2></div></div>
+          <fieldset class="phase-grid" id="phaseOptions">
+            <legend class="sr-only">Choose the fluid phase</legend>
+          </fieldset>
+          <div class="hint" id="phaseHint" hidden></div>
+        </section>
+
+        <section class="step" aria-labelledby="properties-heading">
+          <div class="step-heading"><span>02</span><div><p class="eyebrow">Calculate</p><h2 id="properties-heading">Determine the missing properties</h2></div></div>
+          <div class="property-grid" id="propertyInputs"></div>
+          <p class="helper">Enter values in the units shown. Small differences from table interpolation are accepted.</p>
+        </section>
+
+        <section class="step" aria-labelledby="diagrams-heading">
+          <div class="step-heading"><span>03</span><div><p class="eyebrow">Locate</p><h2 id="diagrams-heading">Place the state on both diagrams</h2></div></div>
+          <p class="helper">Click once on each schematic diagram. Placement is recorded for instructor review.</p>
+          <div class="diagram-grid">
+            <figure class="diagram"><figcaption><em>T–v</em> diagram</figcaption><svg id="tvDiagram" class="plot" role="img" aria-label="Schematic temperature-specific volume diagram"></svg></figure>
+            <figure class="diagram"><figcaption><em>P–v</em> diagram</figcaption><svg id="pvDiagram" class="plot" role="img" aria-label="Schematic pressure-specific volume diagram"></svg></figure>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button class="secondary-button" id="hintButton" type="button">Give me a phase hint</button>
+          <button class="primary-button" id="checkButton" type="button">Check my work</button>
+        </div>
+        <section class="results" id="results" aria-live="polite" hidden></section>
+        <section class="practice-panel" id="practicePanel" aria-labelledby="practice-heading" hidden>
+          <p class="eyebrow">Official case complete</p>
+          <h2 id="practice-heading">Continue learning in Practice Mode</h2>
+          <p>Your official submission is protected. Practice cases provide the same feedback but do not change your official result.</p>
+          <div class="practice-actions">
+            <button class="primary-button" id="randomPractice" type="button">Try a random case</button>
+            <button class="secondary-button" id="nextPractice" type="button">Try the next case</button>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer><span>Thermodynamics teaching tool</span><span>© Dr. Nuha Aljuneidi</span></footer>
+  <script src="config.js"></script>
+  <script src="cases.js"></script>
+  <script src="app-v2.js"></script>
+</body>
+</html>
