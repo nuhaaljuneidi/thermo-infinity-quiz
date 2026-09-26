@@ -24,15 +24,35 @@
       <h1>One state. Two diagrams.<br>Infinite practice.</h1>
       <p class="lead">Complete your assigned state first. After submitting it successfully, continue with unlimited practice cases.</p>
 
-      <form class="identity-panel" id="identityForm">
+      <form class="identity-panel" id="identityForm" novalidate>
         <div>
-          <label for="studentName">Student name</label>
-          <input id="studentName" name="studentName" autocomplete="name" required>
+          <label for="firstName">First name</label>
+          <input id="firstName" name="firstName" autocomplete="given-name" required>
         </div>
         <div>
-          <label for="studentId">Student ID or university email</label>
-          <input id="studentId" name="studentId" autocomplete="email" required>
-          <small>Used only to assign and restore your case.</small>
+          <label for="lastName">Last name</label>
+          <input id="lastName" name="lastName" autocomplete="family-name" required>
+        </div>
+        <div class="field-wide">
+          <label for="erauEmail">ERAU student email</label>
+          <input id="erauEmail" name="erauEmail" type="email" autocomplete="email" aria-describedby="emailError" required>
+          <span class="field-error" id="emailError" role="alert"></span>
+          <small>Used only to assign and restore your case. Must end in @my.erau.edu.</small>
+        </div>
+        <div>
+          <label for="courseSection">Course section</label>
+          <select id="courseSection" name="courseSection" aria-describedby="sectionError" required>
+            <option value="" disabled selected>Select your section</option>
+            <option value="Section 1 — 8:00–8:50 AM">Section 1 — 8:00–8:50 AM</option>
+            <option value="Section 2 — 9:00–9:50 AM">Section 2 — 9:00–9:50 AM</option>
+            <option value="Other section">Other section</option>
+          </select>
+          <span class="field-error" id="sectionError" role="alert"></span>
+        </div>
+        <div class="field-wide conditional-field" id="otherSectionWrap" hidden>
+          <label for="otherSection">Enter your section</label>
+          <input id="otherSection" name="otherSection" aria-describedby="otherSectionError">
+          <span class="field-error" id="otherSectionError" role="alert"></span>
         </div>
         <button class="primary-button" type="submit">Assign my case</button>
       </form>

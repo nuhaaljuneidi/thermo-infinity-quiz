@@ -32,11 +32,19 @@ main{min-height:calc(100vh - 150px)}
 .intro .eyebrow{color:var(--gold)}
 h1{font-family:Georgia,serif;font-size:clamp(2.5rem,5.2vw,5.2rem);line-height:1.02;letter-spacing:-.035em;margin:0;max-width:900px}
 .lead{font-size:clamp(1.05rem,1.8vw,1.3rem);max-width:720px;color:#dbe4ee;margin:25px 0 38px}
-.identity-panel{display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,1.4fr) auto;gap:16px;align-items:end;background:white;color:var(--ink);padding:22px;border-radius:var(--radius);max-width:980px;box-shadow:var(--shadow)}
+.identity-panel{display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:16px 18px;align-items:start;background:white;color:var(--ink);padding:22px;border-radius:var(--radius);max-width:980px;box-shadow:var(--shadow)}
+.identity-panel>div{display:flex;flex-direction:column}
+.identity-panel>.field-wide{grid-column:1/-1}
+.identity-panel>button{grid-column:1/-1;justify-self:start;margin-top:6px}
+.conditional-field[hidden]{display:none}
 label{display:block;font-weight:700;margin-bottom:7px}
-input{width:100%;min-height:48px;border:1px solid #aab6c4;border-radius:8px;padding:10px 12px;background:white;color:var(--ink)}
-input:focus,button:focus-visible{outline:3px solid rgba(255,202,5,.75);outline-offset:2px}
+input,select{width:100%;min-height:48px;border:1px solid #aab6c4;border-radius:8px;padding:10px 12px;background:white;color:var(--ink)}
+select{appearance:auto}
+input:focus,select:focus,button:focus-visible{outline:3px solid rgba(255,202,5,.75);outline-offset:2px}
+input[aria-invalid="true"],select[aria-invalid="true"]{border-color:var(--danger)}
 small{display:block;color:var(--muted);margin-top:5px}
+.field-error{display:block;color:var(--danger);font-size:.85rem;font-weight:700;margin-top:6px;min-height:0}
+.field-error:empty{margin-top:0}
 .primary-button,.secondary-button{min-height:48px;padding:11px 20px;border-radius:8px;font-weight:800;border:2px solid var(--navy)}
 .primary-button{background:var(--gold);color:var(--navy)}
 .primary-button:hover{background:#ffda4a}
