@@ -74,7 +74,6 @@ function setMode(mode){quizMode=mode;const practice=mode==="practice";$('modeBad
 const PLOT_LEFT=56, PLOT_RIGHT=404, PLOT_TOP=34, PLOT_BOTTOM=214;
 const APEX_X=230, APEX_Y=60, DOME_BASE_Y=PLOT_BOTTOM;
 const DOME_LEFT_BASE_X=114, DOME_RIGHT_BASE_X=346;
-const DOME_SHAPE_EXPONENT=0.55;
 const BOUNDARY_TOLERANCE_PX=16;
 const ISOTHERM_Y=96, ISOBAR_Y=168;
 const ARROW_STEP=6, ARROW_STEP_BIG=24;
@@ -83,19 +82,30 @@ function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
 
 /** The single source of truth for the dome's shape: the x position of the
  *  left ("saturated liquid") or right ("saturated vapor") boundary at a
- *  given plot-space y. Used both to draw the dome and to grade clicks. */
+ *  given plot-space y. Used both to draw the dome and to grade clicks.
+ *  s=0 at the critical point, s=1 at the dome's base; x moves away from
+ *  the apex as sqrt(s), which gives a ROUNDED, horizontally-tangent top
+ *  (a cusp/triangle would appear only if this were sampled with uniform
+ *  steps in y -- see domeOutlinePoints, which samples uniformly in
+ *  sqrt(s) instead so the drawn curve stays smooth right up to the apex). */
 function domeX(y,side){
   const yy=clamp(y,APEX_Y,DOME_BASE_Y);
-  const t=(DOME_BASE_Y-yy)/(DOME_BASE_Y-APEX_Y);
-  const k=Math.pow(t,DOME_SHAPE_EXPONENT);
-  const baseX=side==='left'?DOME_LEFT_BASE_X:DOME_RIGHT_BASE_X;
-  return baseX+(APEX_X-baseX)*k;
+  const s=(yy-APEX_Y)/(DOME_BASE_Y-APEX_Y);
+  const width=side==='left'?(APEX_X-DOME_LEFT_BASE_X):(DOME_RIGHT_BASE_X-APEX_X);
+  const sign=side==='left'?-1:1;
+  return APEX_X+sign*width*Math.sqrt(s);
 }
 
-function domeOutlinePoints(side,steps=24){
+/** Samples the boundary from the apex (index 0) to the base (last index).
+ *  Sampling uniformly in u=sqrt(s) -- rather than uniformly in y -- packs
+ *  many points close together near the apex, where domeX changes fastest,
+ *  which is what actually removes the visible cusp at the critical point. */
+function domeOutlinePoints(side,steps=40){
   const pts=[];
   for(let i=0;i<=steps;i++){
-    const y=DOME_BASE_Y-(DOME_BASE_Y-APEX_Y)*(i/steps);
+    const u=i/steps;
+    const s=u*u;
+    const y=APEX_Y+(DOME_BASE_Y-APEX_Y)*s;
     pts.push([domeX(y,side),y]);
   }
   return pts;
@@ -177,14 +187,51 @@ function regionLabelForGuide(region){
   })[region]||'correct region';
 }
 
-function guideLineSVG(y,{bend,label}){
+/** Draws one schematic guide line at height y.
+ *  - Straight mode (liquidOffset/vaporOffset omitted): a plain horizontal
+ *    line, used when this diagram's own axis quantity is the one held
+ *    constant (a T-v isotherm, or a P-v isobar -- both are exactly
+ *    horizontal by definition, everywhere, not just inside the dome).
+ *  - Branched mode: the line is only horizontal *through the two-phase
+ *    region* (where the saturation condition really does force it flat).
+ *    Each outer branch runs for a SHORT, fixed distance out from the dome
+ *    (BRANCH_RUN px) rather than all the way to the plot edge: stretched
+ *    across the whole compressed-liquid/superheated-vapor width, a smooth
+ *    curve inevitably reaches its target height long before it reaches
+ *    the saturation line horizontally, which looks like the line
+ *    "changes direction" out in open space, well before actually
+ *    touching the saturated-liquid/vapor boundary. Kept short, the same
+ *    curve shape stays visibly steep right up to the point where it
+ *    meets the dome, and only bends there -- in the physically correct
+ *    direction:
+ *      T-v isobar:    compressed-liquid branch dips slightly (v barely
+ *                     changes T at constant p in the liquid); the vapor
+ *                     branch rises (T increases with v at constant p in
+ *                     an ideal-gas-like superheated region).
+ *      P-v isotherm:  compressed-liquid branch rises steeply (P climbs
+ *                     fast for a small v decrease in a near-incompressible
+ *                     liquid); the vapor branch decreases smoothly, like
+ *                     an inverse-volume curve (P falls as v rises at
+ *                     constant T). */
+function guideLineSVG(y,{label,liquidOffset,vaporOffset}){
   const leftX=domeX(y,'left'), rightX=domeX(y,'right');
-  let bendMarks='';
-  if(bend){
-    bendMarks=`<path d="M${(leftX-26).toFixed(1)} ${(y+16).toFixed(1)} L${(leftX-6).toFixed(1)} ${(y-2).toFixed(1)}" stroke="#173d65" stroke-width="1.6" fill="none"/>`+
-      `<path d="M${(rightX+6).toFixed(1)} ${(y-2).toFixed(1)} L${(rightX+26).toFixed(1)} ${(y+16).toFixed(1)}" stroke="#173d65" stroke-width="1.6" fill="none"/>`;
+  let d;
+  if(liquidOffset==null&&vaporOffset==null){
+    d=`M${PLOT_LEFT} ${y.toFixed(1)} L${PLOT_RIGHT} ${y.toFixed(1)}`;
+  } else {
+    const BRANCH_RUN=44;
+    const liquidOuterX=Math.max(PLOT_LEFT,leftX-BRANCH_RUN);
+    const vaporOuterX=Math.min(PLOT_RIGHT,rightX+BRANCH_RUN);
+    const liquidEdgeY=y+(liquidOffset||0);
+    const vaporEdgeY=y+(vaporOffset||0);
+    d=`M${liquidOuterX.toFixed(1)} ${liquidEdgeY.toFixed(1)} Q${liquidOuterX.toFixed(1)} ${y.toFixed(1)} ${leftX.toFixed(1)} ${y.toFixed(1)} `+
+      `L${rightX.toFixed(1)} ${y.toFixed(1)} Q${vaporOuterX.toFixed(1)} ${y.toFixed(1)} ${vaporOuterX.toFixed(1)} ${vaporEdgeY.toFixed(1)}`;
   }
-  return `<g class="guide-line"><path d="M${PLOT_LEFT} ${y} L${PLOT_RIGHT} ${y}" stroke="#173d65" stroke-width="1.6" stroke-dasharray="6 5" fill="none" opacity=".8"/>${bendMarks}<text x="${PLOT_LEFT+4}" y="${y-6}" font-size="10.5" fill="#173d65" font-style="italic">${label}</text></g>`;
+  // Anchored at the plot's own left edge (not relative to the dome) so the
+  // label sits in the open margin before the compressed-liquid branch
+  // curve even starts bending, and can't end up crossing the (much wider,
+  // now that the dome is rounded rather than pointy) saturation boundary.
+  return `<g class="guide-line"><path d="${d}" stroke="#173d65" stroke-width="1.6" stroke-dasharray="6 5" fill="none" opacity=".8"/><text x="${PLOT_LEFT+2}" y="${(y-7).toFixed(1)}" font-size="9" fill="#173d65" font-style="italic" paint-order="stroke" stroke="#fff" stroke-width="3">${label}</text></g>`;
 }
 
 function buildDiagramMarkup(kind){
@@ -192,15 +239,17 @@ function buildDiagramMarkup(kind){
   const flags=parseGivenFlags(activeCase.given);
   const guides=[];
   if(kind==='tv'){
-    if(flags.hasT) guides.push(guideLineSVG(ISOTHERM_Y,{bend:false,label:'schematic isotherm (T given)'}));
-    if(flags.hasP) guides.push(guideLineSVG(ISOBAR_Y,{bend:true,label:'schematic isobar (p given)'}));
+    if(flags.hasT) guides.push(guideLineSVG(ISOTHERM_Y,{label:'schematic isotherm (T given)'}));
+    if(flags.hasP) guides.push(guideLineSVG(ISOBAR_Y,{label:'schematic isobar (p given)',liquidOffset:14,vaporOffset:-30}));
   } else {
-    if(flags.hasP) guides.push(guideLineSVG(ISOBAR_Y,{bend:false,label:'schematic isobar (p given)'}));
-    if(flags.hasT) guides.push(guideLineSVG(ISOTHERM_Y,{bend:true,label:'schematic isotherm (T given)'}));
+    if(flags.hasP) guides.push(guideLineSVG(ISOBAR_Y,{label:'schematic isobar (p given)'}));
+    if(flags.hasT) guides.push(guideLineSVG(ISOTHERM_Y,{label:'schematic isotherm (T given)',liquidOffset:-36,vaporOffset:28}));
   }
+  // domeOutlinePoints runs apex -> base; reverse the left side so the fill
+  // traces a single loop: base-left -> apex -> base-right.
   const leftPts=domeOutlinePoints('left');
   const rightPts=domeOutlinePoints('right');
-  const domeFillD=pathFromPoints(leftPts.concat(rightPts.slice().reverse()))+' Z';
+  const domeFillD=pathFromPoints(leftPts.slice().reverse().concat(rightPts))+' Z';
   const title=kind==='tv'?'Temperature versus specific volume schematic diagram':'Pressure versus specific volume schematic diagram';
   const desc=kind==='tv'
     ?'A mountain-shaped saturation dome on temperature versus specific volume axes. The region left of the dome is compressed liquid, the region inside the dome is the two-phase saturated mixture, and the region right of the dome is superheated vapor. The left boundary is the saturated-liquid line and the right boundary, drawn dashed, is the saturated-vapor line.'
@@ -317,13 +366,16 @@ function showStrongerGuide(kind){
   const region=activeCase.phase;
   const g=$(`${kind}Highlight`);
   if(!g) return;
+  // domeOutlinePoints runs apex -> base; these shapes hug the dome from
+  // its base up to the apex and then out to a plot corner, so the left/
+  // right curves are reversed back to base -> apex first.
   let shapeD='';
   if(region==='Compressed liquid'){
-    shapeD=pathFromPoints(domeOutlinePoints('left').concat([[PLOT_LEFT,APEX_Y],[PLOT_LEFT,DOME_BASE_Y]]))+' Z';
+    shapeD=pathFromPoints(domeOutlinePoints('left').slice().reverse().concat([[PLOT_LEFT,APEX_Y],[PLOT_LEFT,DOME_BASE_Y]]))+' Z';
   } else if(region==='Superheated vapor'){
-    shapeD=pathFromPoints(domeOutlinePoints('right').concat([[PLOT_RIGHT,APEX_Y],[PLOT_RIGHT,DOME_BASE_Y]]))+' Z';
+    shapeD=pathFromPoints(domeOutlinePoints('right').slice().reverse().concat([[PLOT_RIGHT,APEX_Y],[PLOT_RIGHT,DOME_BASE_Y]]))+' Z';
   } else if(region==='Saturated mixture'){
-    shapeD=pathFromPoints(domeOutlinePoints('left').concat(domeOutlinePoints('right').slice().reverse()))+' Z';
+    shapeD=pathFromPoints(domeOutlinePoints('left').slice().reverse().concat(domeOutlinePoints('right')))+' Z';
   }
   let boundaryStroke='';
   if(region==='Saturated liquid') boundaryStroke=`<path d="${pathFromPoints(domeOutlinePoints('left'))}" fill="none" stroke="#ffca05" stroke-width="5" opacity=".85"/>`;
