@@ -187,45 +187,76 @@ function regionLabelForGuide(region){
   })[region]||'correct region';
 }
 
-/** Draws one schematic guide line at height y.
- *  - Straight mode (liquidOffset/vaporOffset omitted): a plain horizontal
- *    line, used when this diagram's own axis quantity is the one held
- *    constant (a T-v isotherm, or a P-v isobar -- both are exactly
- *    horizontal by definition, everywhere, not just inside the dome).
- *  - Branched mode: the line is only horizontal *through the two-phase
- *    region* (where the saturation condition really does force it flat).
- *    Each outer branch runs for a SHORT, fixed distance out from the dome
- *    (BRANCH_RUN px) rather than all the way to the plot edge: stretched
- *    across the whole compressed-liquid/superheated-vapor width, a smooth
- *    curve inevitably reaches its target height long before it reaches
- *    the saturation line horizontally, which looks like the line
- *    "changes direction" out in open space, well before actually
- *    touching the saturated-liquid/vapor boundary. Kept short, the same
- *    curve shape stays visibly steep right up to the point where it
- *    meets the dome, and only bends there -- in the physically correct
- *    direction:
- *      T-v isobar:    compressed-liquid branch dips slightly (v barely
- *                     changes T at constant p in the liquid); the vapor
- *                     branch rises (T increases with v at constant p in
- *                     an ideal-gas-like superheated region).
- *      P-v isotherm:  compressed-liquid branch rises steeply (P climbs
- *                     fast for a small v decrease in a near-incompressible
- *                     liquid); the vapor branch decreases smoothly, like
- *                     an inverse-volume curve (P falls as v rises at
- *                     constant T). */
-function guideLineSVG(y,{label,liquidOffset,vaporOffset}){
+/** Builds the single connected path "d" attribute for the shaped P-v
+ *  isotherm: a near-vertical compressed-liquid branch that connects to
+ *  the dome at (leftX,y) with a genuinely vertical tangent (so it stays
+ *  steep all the way in, instead of flattening out before it arrives),
+ *  a horizontal two-phase plateau from (leftX,y) to (rightX,y), and a
+ *  monotonically-down-and-right vapor branch (P falls as v rises at
+ *  constant T) that flattens toward its far end instead of curling. */
+function pvIsothermPathD(y,leftX,rightX){
+  const LIQUID_RUN=9, LIQUID_RISE=34;
+  const VAPOR_RUN=44, VAPOR_DROP=28;
+  const liquidOuterX=Math.max(PLOT_LEFT,leftX-LIQUID_RUN);
+  const liquidOuterY=y-LIQUID_RISE;
+  const liquidMidY=(liquidOuterY+y)/2;
+  const vaporOuterX=Math.min(PLOT_RIGHT,rightX+VAPOR_RUN);
+  const vaporRun=vaporOuterX-rightX;
+  const vaporP1X=rightX+vaporRun*0.25, vaporP1Y=y+VAPOR_DROP*0.7;
+  const vaporP2X=rightX+vaporRun*0.7, vaporP2Y=y+VAPOR_DROP*0.95;
+  const vaporOuterY=y+VAPOR_DROP;
+  return `M${liquidOuterX.toFixed(1)} ${liquidOuterY.toFixed(1)} `+
+    `C${liquidOuterX.toFixed(1)} ${liquidMidY.toFixed(1)}, ${leftX.toFixed(1)} ${liquidMidY.toFixed(1)}, ${leftX.toFixed(1)} ${y.toFixed(1)} `+
+    `L${rightX.toFixed(1)} ${y.toFixed(1)} `+
+    `C${vaporP1X.toFixed(1)} ${vaporP1Y.toFixed(1)}, ${vaporP2X.toFixed(1)} ${vaporP2Y.toFixed(1)}, ${vaporOuterX.toFixed(1)} ${vaporOuterY.toFixed(1)}`;
+}
+
+/** Builds the single connected path "d" attribute for the shaped T-v
+ *  isobar: a near-vertical compressed-liquid branch that approaches the
+ *  dome at (leftX,y) from below with a genuinely vertical tangent, a
+ *  horizontal two-phase plateau from (leftX,y) to (rightX,y), and a
+ *  monotonically-up-and-right vapor branch (T rises as v increases at
+ *  constant p) that flattens toward its far end instead of curling.
+ *  Uses its own geometry -- not pvIsothermPathD() with flipped signs --
+ *  since the two guides are visually and thermodynamically distinct. */
+function tvIsobarPathD(y,leftX,rightX){
+  const LIQUID_RUN=9, LIQUID_DIP=34;
+  const VAPOR_RUN=44, VAPOR_RISE=30;
+  const liquidOuterX=Math.max(PLOT_LEFT,leftX-LIQUID_RUN);
+  const liquidOuterY=y+LIQUID_DIP;
+  const liquidMidY=(liquidOuterY+y)/2;
+  const vaporOuterX=Math.min(PLOT_RIGHT,rightX+VAPOR_RUN);
+  const vaporRun=vaporOuterX-rightX;
+  const vaporP1X=rightX+vaporRun*0.25, vaporP1Y=y-VAPOR_RISE*0.7;
+  const vaporP2X=rightX+vaporRun*0.7, vaporP2Y=y-VAPOR_RISE*0.95;
+  const vaporOuterY=y-VAPOR_RISE;
+  return `M${liquidOuterX.toFixed(1)} ${liquidOuterY.toFixed(1)} `+
+    `C${liquidOuterX.toFixed(1)} ${liquidMidY.toFixed(1)}, ${leftX.toFixed(1)} ${liquidMidY.toFixed(1)}, ${leftX.toFixed(1)} ${y.toFixed(1)} `+
+    `L${rightX.toFixed(1)} ${y.toFixed(1)} `+
+    `C${vaporP1X.toFixed(1)} ${vaporP1Y.toFixed(1)}, ${vaporP2X.toFixed(1)} ${vaporP2Y.toFixed(1)}, ${vaporOuterX.toFixed(1)} ${vaporOuterY.toFixed(1)}`;
+}
+
+/** Draws one schematic guide line at height y. `mode` selects the shape
+ *  entirely -- no per-case conditions, only the diagram kind and which
+ *  property (T and/or p) is given decide which mode buildDiagramMarkup
+ *  passes in (see the selection rules there):
+ *    'horizontal'   a plain flat line, used when THIS diagram's own axis
+ *                   quantity is the one held constant (a T-v isotherm, or
+ *                   a P-v isobar -- both exactly horizontal everywhere,
+ *                   not just inside the dome).
+ *    'pv-isotherm'  the shaped P-v curve for a case where T is given.
+ *    'tv-isobar'    the shaped T-v curve for a case where p is given. */
+function guideLineSVG(y,{label,mode}){
   const leftX=domeX(y,'left'), rightX=domeX(y,'right');
   let d;
-  if(liquidOffset==null&&vaporOffset==null){
+  if(mode==='horizontal'){
     d=`M${PLOT_LEFT} ${y.toFixed(1)} L${PLOT_RIGHT} ${y.toFixed(1)}`;
+  } else if(mode==='pv-isotherm'){
+    d=pvIsothermPathD(y,leftX,rightX);
+  } else if(mode==='tv-isobar'){
+    d=tvIsobarPathD(y,leftX,rightX);
   } else {
-    const BRANCH_RUN=44;
-    const liquidOuterX=Math.max(PLOT_LEFT,leftX-BRANCH_RUN);
-    const vaporOuterX=Math.min(PLOT_RIGHT,rightX+BRANCH_RUN);
-    const liquidEdgeY=y+(liquidOffset||0);
-    const vaporEdgeY=y+(vaporOffset||0);
-    d=`M${liquidOuterX.toFixed(1)} ${liquidEdgeY.toFixed(1)} Q${liquidOuterX.toFixed(1)} ${y.toFixed(1)} ${leftX.toFixed(1)} ${y.toFixed(1)} `+
-      `L${rightX.toFixed(1)} ${y.toFixed(1)} Q${vaporOuterX.toFixed(1)} ${y.toFixed(1)} ${vaporOuterX.toFixed(1)} ${vaporEdgeY.toFixed(1)}`;
+    throw new Error(`guideLineSVG: unknown mode "${mode}"`);
   }
   // Anchored at the plot's own left edge (not relative to the dome) so the
   // label sits in the open margin before the compressed-liquid branch
@@ -239,11 +270,11 @@ function buildDiagramMarkup(kind){
   const flags=parseGivenFlags(activeCase.given);
   const guides=[];
   if(kind==='tv'){
-    if(flags.hasT) guides.push(guideLineSVG(ISOTHERM_Y,{label:'schematic isotherm (T given)'}));
-    if(flags.hasP) guides.push(guideLineSVG(ISOBAR_Y,{label:'schematic isobar (p given)',liquidOffset:14,vaporOffset:-30}));
+    if(flags.hasT) guides.push(guideLineSVG(ISOTHERM_Y,{label:'schematic isotherm (T given)',mode:'horizontal'}));
+    if(flags.hasP) guides.push(guideLineSVG(ISOBAR_Y,{label:'schematic isobar (p given)',mode:'tv-isobar'}));
   } else {
-    if(flags.hasP) guides.push(guideLineSVG(ISOBAR_Y,{label:'schematic isobar (p given)'}));
-    if(flags.hasT) guides.push(guideLineSVG(ISOTHERM_Y,{label:'schematic isotherm (T given)',liquidOffset:-36,vaporOffset:28}));
+    if(flags.hasP) guides.push(guideLineSVG(ISOBAR_Y,{label:'schematic isobar (p given)',mode:'horizontal'}));
+    if(flags.hasT) guides.push(guideLineSVG(ISOTHERM_Y,{label:'schematic isotherm (T given)',mode:'pv-isotherm'}));
   }
   // domeOutlinePoints runs apex -> base; reverse the left side so the fill
   // traces a single loop: base-left -> apex -> base-right.
