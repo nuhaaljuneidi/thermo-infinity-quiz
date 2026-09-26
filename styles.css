@@ -51,6 +51,7 @@ small{display:block;color:var(--muted);margin-top:5px}
 .secondary-button{background:white;color:var(--navy)}
 .secondary-button:hover{background:#eaf0f7}
 .workspace{display:grid;grid-template-columns:minmax(240px,330px) minmax(0,1fr);gap:clamp(25px,5vw,72px);max-width:1450px;margin:auto;padding:clamp(28px,5vw,70px)}
+.workspace[hidden]{display:none}
 .case-rail{align-self:start;position:sticky;top:24px;background:var(--navy);color:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-top:6px solid var(--gold)}
 .case-rail .eyebrow{color:var(--gold)}
 .mode-badge{display:inline-flex;align-items:center;min-height:32px;margin:0 0 15px;padding:6px 11px;border:1px solid var(--gold);border-radius:999px;color:var(--gold);font-size:.76rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
