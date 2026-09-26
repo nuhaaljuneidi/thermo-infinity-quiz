@@ -87,10 +87,51 @@
 
         <section class="step" aria-labelledby="diagrams-heading">
           <div class="step-heading"><span>03</span><div><p class="eyebrow">Locate</p><h2 id="diagrams-heading">Place the state on both diagrams</h2></div></div>
-          <p class="helper">Click once on each schematic diagram. Placement is recorded for instructor review.</p>
+          <p class="helper">Place your state on each diagram by clicking it, by focusing it and using the arrow keys, or by choosing a region from the dropdown below it. Dashed guide lines show the given temperature and/or pressure. Both diagrams must show the correct region to pass this step.</p>
           <div class="diagram-grid">
-            <figure class="diagram"><figcaption><em>T–v</em> diagram</figcaption><svg id="tvDiagram" class="plot" role="img" aria-label="Schematic temperature-specific volume diagram"></svg></figure>
-            <figure class="diagram"><figcaption><em>P–v</em> diagram</figcaption><svg id="pvDiagram" class="plot" role="img" aria-label="Schematic pressure-specific volume diagram"></svg></figure>
+            <figure class="diagram">
+              <figcaption><em>T–v</em> diagram</figcaption>
+              <svg id="tvDiagram" class="plot" role="img" tabindex="0" aria-label="Schematic temperature versus specific volume diagram" aria-describedby="tvStatus"></svg>
+              <p class="schematic-note">Schematic — not to scale.</p>
+              <p class="diagram-status" id="tvStatus" aria-live="polite">No point placed yet.</p>
+              <div class="diagram-controls">
+                <button class="secondary-button small-button" id="tvReset" type="button">Reset point</button>
+                <div class="region-select">
+                  <label for="tvRegionSelect">Choose the region instead of placing a point</label>
+                  <select id="tvRegionSelect">
+                    <option value="" disabled selected>Select a region</option>
+                    <option value="Compressed liquid">Compressed-liquid region</option>
+                    <option value="Saturated liquid">Saturated-liquid boundary</option>
+                    <option value="Saturated mixture">Two-phase region</option>
+                    <option value="Saturated vapor">Saturated-vapor boundary</option>
+                    <option value="Superheated vapor">Superheated-vapor region</option>
+                  </select>
+                </div>
+              </div>
+            </figure>
+            <figure class="diagram">
+              <figcaption><em>P–v</em> diagram</figcaption>
+              <svg id="pvDiagram" class="plot" role="img" tabindex="0" aria-label="Schematic pressure versus specific volume diagram" aria-describedby="pvStatus"></svg>
+              <p class="schematic-note">Schematic — not to scale.</p>
+              <p class="diagram-status" id="pvStatus" aria-live="polite">No point placed yet.</p>
+              <div class="diagram-controls">
+                <button class="secondary-button small-button" id="pvReset" type="button">Reset point</button>
+                <div class="region-select">
+                  <label for="pvRegionSelect">Choose the region instead of placing a point</label>
+                  <select id="pvRegionSelect">
+                    <option value="" disabled selected>Select a region</option>
+                    <option value="Compressed liquid">Compressed-liquid region</option>
+                    <option value="Saturated liquid">Saturated-liquid boundary</option>
+                    <option value="Saturated mixture">Two-phase region</option>
+                    <option value="Saturated vapor">Saturated-vapor boundary</option>
+                    <option value="Superheated vapor">Superheated-vapor region</option>
+                  </select>
+                </div>
+              </div>
+            </figure>
+          </div>
+          <div class="stronger-guide" id="strongerGuideWrap" hidden>
+            <button class="secondary-button" id="strongerGuideButton" type="button">Show stronger diagram guide</button>
           </div>
         </section>
 
